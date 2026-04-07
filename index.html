@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>인생네컷 — Photobooth</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e0d0b;
+  --surface: #181714;
+  --surface2: #211f1b;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0ece4;
+  --text2: #8a8680;
+  --text3: #555250;
+  --accent: #c9a96e;
+  --accent2: #a07c44;
+  --danger: #c06060;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.screen { display: none; flex-direction: column; height: 100vh; overflow: hidden; }
+.screen.active { display: flex; }
+
+/* ── CAMERA SCREEN ── */
+.cam-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.logo-text { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--accent); }
+.cam-status { font-size: 11px; letter-spacing: 2px; color: var(--text3); text-transform: uppercase; }
+
+.cam-body {
+  flex: 1; display: grid; grid-template-columns: 1fr 260px;
+  overflow: hidden; min-height: 0;
+}
+
+.viewfinder-col {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border); overflow: hidden;
+}
+
+.viewfinder-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 18px; background: var(--bg); overflow: hidden; min-height: 0;
+}
+
+.viewfinder-box {
+  position: relative; width: 100%; max-width: 380px;
+  aspect-ratio: 3/4; background: #000; border-radius: 4px; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--border2), 0 20px 60px rgba(0,0,0,0.6);
+}
+.vf-corner {
+  position: absolute; width: 18px; height: 18px;
+  border-color: var(--accent); border-style: solid; z-index: 10; pointer-events: none;
+}
+.vf-corner.tl { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+.vf-corner.tr { top: 8px; right: 8px; border-width: 2px 2px 0 0; }
+.vf-corner.bl { bottom: 8px; left: 8px; border-width: 0 0 2px 2px; }
+.vf-corner.br { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+#video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
+#frameOverlay {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: fill; pointer-events: none; z-index: 5; display: none;
+}
+.flash-overlay {
+  position: absolute; inset: 0; background: white; z-index: 8;
+  opacity: 0; pointer-events: none; transition: opacity 0.06s;
+}
+.countdown-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  z-index: 7; pointer-events: none; opacity: 0; transition: opacity 0.2s;
+}
+.countdown-overlay.show { opacity: 1; }
+.countdown-num {
+  font-family: 'Playfair Display', serif; font-size: 110px; color: #fff;
+  text-shadow: 0 4px 30px rgba(0,0,0,0.5); line-height: 1;
+  transition: transform 0.15s cubic-bezier(.34,1.56,.64,1); transform: scale(0.85);
+}
+.countdown-num.pop { transform: scale(1.08); }
+.cam-placeholder {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; background: #0a0908; z-index: 2;
+}
+.cam-placeholder svg { opacity: 0.22; }
+.cam-placeholder p { font-size: 12px; color: var(--text3); letter-spacing: 1px; }
+
+.shot-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.shot-pips { display: flex; gap: 4px; flex: 1; }
+.pip {
+  flex: 1; height: 5px; border-radius: 3px;
+  background: var(--surface2); border: 1px solid var(--border2); transition: background 0.2s;
+}
+.pip.done { background: var(--accent); border-color: var(--accent2); }
+.shot-label { font-size: 10px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap; }
+
+.cam-controls {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+}
+.frame-bar {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 18px; border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+}
+.frame-bar-label { font-size: 9px; letter-spacing: 2px; color: var(--text3); text-transform: uppercase; }
+
+/* ── THUMB PANEL ── */
+.thumb-col {
+  background: var(--surface); display: flex; flex-direction: column;
+  padding: 14px; gap: 10px; overflow-y: auto;
+}
+.thumb-col-title {
+  font-size: 10px; letter-spacing: 2px; color: var(--text3);
+  text-transform: uppercase; text-align: center; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.thumbs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; flex: 1; }
+
+.thumb-item {
+  position: relative; aspect-ratio: 3/4; background: var(--surface2); border-radius: 3px;
+  overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s;
+}
+.thumb-item:active { transform: scale(0.96); }
+.thumb-item.selected { border-color: var(--accent); }
+.thumb-item.empty {
+  display: flex; align-items: center; justify-content: center; cursor: default;
+}
+.thumb-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.thumb-check {
+  position: absolute; top: 4px; right: 4px; width: 18px; height: 18px;
+  border-radius: 50%; background: var(--accent);
+  display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s;
+}
+.thumb-item.selected .thumb-check { opacity: 1; }
+.thumb-check::after {
+  content: ''; width: 4px; height: 8px; border: 2px solid #000;
+  border-top: none; border-left: none; transform: rotate(45deg) translateY(-1px);
+}
+.thumb-order {
+  position: absolute; bottom: 4px; left: 4px; background: var(--accent); color: #000;
+  font-size: 9px; font-weight: 500; width: 15px; height: 15px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s;
+}
+.thumb-item.selected .thumb-order { opacity: 1; }
+
+.select-hint {
+  font-size: 11px; color: var(--text2); text-align: center; line-height: 1.6; padding: 2px 0;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  font-family: 'Noto Sans KR', sans-serif; font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase; border: 1px solid var(--border2); background: transparent;
+  color: var(--text2); padding: 8px 14px; border-radius: 3px; cursor: pointer;
+  transition: all 0.12s; white-space: nowrap;
+}
+.btn:hover { border-color: var(--text2); color: var(--text); background: var(--surface2); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-primary {
+  background: var(--accent); color: #000; border-color: var(--accent); font-weight: 500;
+}
+.btn-primary:hover { background: #d4b078; border-color: #d4b078; color: #000; }
+
+.btn-next {
+  width: 100%; font-family: 'Noto Sans KR', sans-serif; font-size: 12px; letter-spacing: 1.5px;
+  text-transform: uppercase; background: var(--accent); color: #000; border: none;
+  padding: 12px; border-radius: 3px; cursor: pointer; transition: opacity 0.15s; font-weight: 500;
+}
+.btn-next:hover { opacity: 0.88; }
+.btn-next:active { transform: scale(0.98); }
+.btn-next:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.sel {
+  font-family: 'Noto Sans KR', sans-serif; font-size: 11px; border: 1px solid var(--border2);
+  background: var(--surface2); color: var(--text2); padding: 8px 28px 8px 10px;
+  border-radius: 3px; cursor: pointer; outline: none; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a8680'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+
+.chip {
+  font-family: 'Noto Sans KR', sans-serif; font-size: 10px; letter-spacing: 0.3px;
+  border: 1px solid var(--border); background: transparent; color: var(--text3);
+  padding: 5px 10px; border-radius: 20px; cursor: pointer; transition: all 0.12s;
+}
+.chip:hover { border-color: var(--border2); color: var(--text2); }
+.chip.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+.upload-chip {
+  font-family: 'Noto Sans KR', sans-serif; font-size: 10px;
+  border: 1px dashed var(--border2); background: transparent; color: var(--text3);
+  padding: 5px 10px; border-radius: 20px; cursor: pointer; transition: all 0.12s;
+}
+.upload-chip:hover { color: var(--text2); border-style: solid; }
+
+.error-bar { font-size: 12px; color: var(--danger); padding: 5px 18px; flex-shrink: 0; }
+
+/* ── PREVIEW SCREEN ── */
+.preview-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.preview-body {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  gap: 40px; padding: 28px; overflow: hidden;
+}
+
+/* Strip: 102:152 ratio */
+.strip-preview {
+  background: #fff; border-radius: 2px;
+  box-shadow: 0 8px 50px rgba(0,0,0,0.55);
+  aspect-ratio: 102/152;
+  height: min(72vh, 520px);
+  display: flex; flex-direction: column;
+  padding: 7px 7px 4px; gap: 0;
+  position: relative; overflow: hidden; flex-shrink: 0;
+}
+.strip-inner {
+  flex: 1; display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(4, 1fr);
+  gap: 4px; min-height: 0;
+}
+.strip-cell { background: #ddd; overflow: hidden; border-radius: 1px; }
+.strip-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.strip-footer {
+  display: flex; align-items: center; justify-content: center; height: 16px; flex-shrink: 0; margin-top: 3px;
+}
+.strip-footer span {
+  font-family: 'Playfair Display', serif; font-size: 7px;
+  color: #bbb; letter-spacing: 3px; text-transform: uppercase;
+}
+
+.preview-info { display: flex; flex-direction: column; gap: 18px; max-width: 230px; }
+.preview-info h2 {
+  font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 400; line-height: 1.3;
+}
+.preview-info h2 em { color: var(--accent); font-style: italic; }
+.preview-info p { font-size: 12px; color: var(--text2); line-height: 1.6; }
+
+.spec-row { display: flex; flex-direction: column; gap: 0; }
+.spec-item {
+  display: flex; justify-content: space-between; font-size: 11px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.spec-item .label { color: var(--text3); letter-spacing: 1px; }
+.spec-item .val { color: var(--text2); }
+
+.preview-actions { display: flex; flex-direction: column; gap: 8px; }
+.btn-download {
+  font-family: 'Noto Sans KR', sans-serif; font-size: 13px; letter-spacing: 1.5px;
+  text-transform: uppercase; background: var(--accent); color: #000; border: none;
+  padding: 13px; border-radius: 3px; cursor: pointer; transition: opacity 0.15s; font-weight: 500; text-align: center;
+}
+.btn-download:hover { opacity: 0.88; }
+
+/* ── PORTRAIT ── */
+@media (orientation: portrait) {
+  .cam-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .viewfinder-col { border-right: none; border-bottom: 1px solid var(--border); }
+  .thumb-col { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 10px 12px; max-height: 130px; flex-shrink: 0; }
+  .thumb-col-title, .select-hint, .btn-next { display: none; }
+  .thumbs-grid { display: flex; flex-direction: row; gap: 7px; height: 100%; min-width: max-content; }
+  .thumb-item { width: 74px; height: auto; }
+  .preview-body { flex-direction: column; padding: 16px; gap: 18px; overflow-y: auto; }
+  .strip-preview { height: auto; width: min(58vw, 260px); }
+  .preview-info { max-width: 100%; }
+}
+
+canvas { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ SCREEN 1: CAMERA ══════════════════ -->
+<div id="screenCamera" class="screen active">
+  <div class="cam-header">
+    <div class="logo-text">인생네컷</div>
+    <div class="cam-status" id="camStatus">준비 중</div>
+  </div>
+
+  <div class="cam-body">
+    <!-- VIEWFINDER -->
+    <div class="viewfinder-col">
+      <div class="viewfinder-wrap">
+        <div class="viewfinder-box">
+          <div class="vf-corner tl"></div><div class="vf-corner tr"></div>
+          <div class="vf-corner bl"></div><div class="vf-corner br"></div>
+          <div class="cam-placeholder" id="camPlaceholder">
+            <svg width="50" height="50" viewBox="0 0 52 52" fill="none">
+              <rect x="2" y="14" width="48" height="34" rx="5" stroke="#fff" stroke-width="2"/>
+              <circle cx="26" cy="31" r="10" stroke="#fff" stroke-width="2"/>
+              <rect x="18" y="9" width="16" height="7" rx="2" stroke="#fff" stroke-width="2"/>
+              <circle cx="42" cy="21" r="2.5" fill="#fff"/>
+            </svg>
+            <p>카메라를 시작하세요</p>
+          </div>
+          <video id="video" autoplay playsinline muted></video>
+          <img id="frameOverlay" alt="">
+          <div class="flash-overlay" id="flashEl"></div>
+          <div class="countdown-overlay" id="countdownOverlay">
+            <div class="countdown-num" id="countdownNum"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="shot-bar">
+        <div class="shot-pips" id="shotPips"></div>
+        <div class="shot-label" id="shotLabel">0 / 8</div>
+      </div>
+
+      <div id="errorBar" class="error-bar" style="display:none;"></div>
+
+      <div class="cam-controls">
+        <select class="sel" id="timerSel">
+          <option value="0">바로 찍기</option>
+          <option value="3" selected>3초 타이머</option>
+          <option value="5">5초 타이머</option>
+          <option value="10">10초 타이머</option>
+        </select>
+        <button class="btn" id="startBtn" onclick="startCamera()">카메라 시작</button>
+        <button class="btn btn-primary" id="shootBtn" onclick="shoot()" disabled style="flex:1;font-size:12px;padding:9px 16px;">
+          촬영 ●
+        </button>
+        <button class="btn" id="retakeBtn" onclick="retakeAll()" style="display:none;">처음부터</button>
+      </div>
+
+      <div class="frame-bar">
+        <span class="frame-bar-label">Frame</span>
+        <button class="chip active" onclick="setFrame('none',this)">없음</button>
+        <button class="chip" onclick="setFrame('white',this)">화이트</button>
+        <button class="chip" onclick="setFrame('pink',this)">핑크</button>
+        <button class="chip" onclick="setFrame('dark',this)">다크</button>
+        <button class="upload-chip" onclick="document.getElementById('frameFileInput').click()">+ 내 프레임</button>
+        <input type="file" id="frameFileInput" accept="image/*" onchange="uploadFrame(event)" style="display:none;">
+      </div>
+    </div>
+
+    <!-- THUMB PANEL -->
+    <div class="thumb-col">
+      <div class="thumb-col-title">촬영한 사진 — 4장 선택</div>
+      <div class="thumbs-grid" id="thumbsGrid"></div>
+      <div class="select-hint" id="selectHint">
+        사진을 탭하여 <strong style="color:var(--accent)">4장</strong> 선택<br>
+        <span style="color:var(--text3);font-size:10px;">선택 순서대로 위→아래 배치</span>
+      </div>
+      <button class="btn-next" id="btnNext" onclick="goToPreview()" disabled>선택 완료 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ SCREEN 2: PREVIEW ══════════════════ -->
+<div id="screenPreview" class="screen">
+  <div class="preview-header">
+    <button class="btn" onclick="backToCamera()">← 다시 선택</button>
+    <div class="logo-text" style="font-size:16px;">완성 미리보기</div>
+    <div style="width:80px;"></div>
+  </div>
+  <div class="preview-body">
+    <div class="strip-preview">
+      <div class="strip-inner" id="stripInner"></div>
+      <div class="strip-footer"><span>인생네컷</span></div>
+    </div>
+    <div class="preview-info">
+      <h2>나만의<br><em>인생네컷</em><br>완성!</h2>
+      <p>선택한 4장이 좌우로 나란히 배치된<br>102 × 152mm 사이즈 스트립입니다.</p>
+      <div class="spec-row">
+        <div class="spec-item"><span class="label">SIZE</span><span class="val">102 × 152 mm</span></div>
+        <div class="spec-item"><span class="label">LAYOUT</span><span class="val">4장 × 2열 (좌우 동일)</span></div>
+        <div class="spec-item"><span class="label">FORMAT</span><span class="val">PNG 고해상도</span></div>
+        <div class="spec-item"><span class="label">DPI</span><span class="val">300 dpi (인쇄용)</span></div>
+        <div class="spec-item"><span class="label">FRAME</span><span class="val" id="specFrame">없음</span></div>
+      </div>
+      <div class="preview-actions">
+        <button class="btn-download" onclick="downloadStrip()">PNG 저장하기 ↓</button>
+        <button class="btn" onclick="backToCamera()" style="text-align:center;">← 사진 다시 선택</button>
+        <button class="btn" onclick="startFresh()" style="text-align:center;color:var(--text3);">처음부터 다시 찍기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas id="hiddenCanvas"></canvas>
+
+<script>
+const MAX_SHOTS = 8, MAX_SEL = 4;
+let stream=null, photos=[], selected=[], currentFrame='none', customFrameImg=null, isShooting=false, cameraOn=false;
+
+const video=document.getElementById('video');
+const shootBtn=document.getElementById('shootBtn');
+const startBtn=document.getElementById('startBtn');
+const retakeBtn=document.getElementById('retakeBtn');
+const btnNext=document.getElementById('btnNext');
+const flashEl=document.getElementById('flashEl');
+const frameOverlay=document.getElementById('frameOverlay');
+const countdownOverlay=document.getElementById('countdownOverlay');
+const countdownNum=document.getElementById('countdownNum');
+const shotLabel=document.getElementById('shotLabel');
+const shotPips=document.getElementById('shotPips');
+const thumbsGrid=document.getElementById('thumbsGrid');
+const errorBar=document.getElementById('errorBar');
+const camStatus=document.getElementById('camStatus');
+const selectHint=document.getElementById('selectHint');
+const hiddenCanvas=document.getElementById('hiddenCanvas');
+const stripInner=document.getElementById('stripInner');
+const specFrame=document.getElementById('specFrame');
+
+function initUI(){
+  shotPips.innerHTML='';
+  for(let i=0;i<MAX_SHOTS;i++){
+    const d=document.createElement('div');
+    d.className='pip'; d.id='pip'+i;
+    shotPips.appendChild(d);
+  }
+  thumbsGrid.innerHTML='';
+  for(let i=0;i<MAX_SHOTS;i++){
+    const el=document.createElement('div');
+    el.className='thumb-item empty'; el.id='thumb'+i;
+    el.style.animationDelay=(i*0.04)+'s';
+    el.innerHTML=`<span style="font-family:'Playfair Display',serif;font-size:16px;color:var(--text3)">${i+1}</span><div class="thumb-check"></div><div class="thumb-order"></div>`;
+    thumbsGrid.appendChild(el);
+  }
+  shotLabel.textContent='0 / 8';
+}
+initUI();
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function startCamera(){
+  try{
+    errorBar.style.display='none';
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1920},height:{ideal:1440}},audio:false});
+    video.srcObject=stream;
+    document.getElementById('camPlaceholder').style.display='none';
+    startBtn.style.display='none';
+    shootBtn.disabled=false;
+    cameraOn=true;
+    camStatus.textContent='촬영 준비됨';
+  }catch(e){
+    errorBar.textContent='카메라 접근이 거부되었습니다. 브라우저 설정에서 카메라를 허용해주세요.';
+    errorBar.style.display='block';
+  }
+}
+
+async function shoot(){
+  if(isShooting||photos.length>=MAX_SHOTS||!cameraOn)return;
+  isShooting=true; shootBtn.disabled=true;
+  camStatus.textContent='촬영 중…';
+  const sec=parseInt(document.getElementById('timerSel').value);
+  if(sec>0){
+    countdownOverlay.classList.add('show');
+    for(let i=sec;i>0;i--){
+      countdownNum.textContent=i;
+      countdownNum.classList.remove('pop');
+      await sleep(30);
+      countdownNum.classList.add('pop');
+      await sleep(970);
+    }
+    countdownNum.textContent='';
+    countdownOverlay.classList.remove('show');
+  }
+  flashEl.style.opacity='1'; await sleep(70); flashEl.style.opacity='0';
+
+  const w=video.videoWidth||1280, h=video.videoHeight||960;
+  hiddenCanvas.width=w; hiddenCanvas.height=h;
+  const ctx=hiddenCanvas.getContext('2d');
+  ctx.save(); ctx.translate(w,0); ctx.scale(-1,1);
+  ctx.drawImage(video,0,0,w,h); ctx.restore();
+
+  const fImg=getFrameImage();
+  if(fImg&&fImg.complete&&fImg.naturalWidth>0) ctx.drawImage(fImg,0,0,w,h);
+
+  const dataUrl=hiddenCanvas.toDataURL('image/png');
+  const idx=photos.length;
+  photos.push(dataUrl);
+  document.getElementById('pip'+idx).classList.add('done');
+
+  const thumb=document.getElementById('thumb'+idx);
+  thumb.classList.remove('empty');
+  thumb.innerHTML=`<img src="${dataUrl}" alt=""><div class="thumb-check"></div><div class="thumb-order"></div>`;
+  thumb.onclick=()=>toggleSelect(idx);
+
+  shotLabel.textContent=`${photos.length} / 8`;
+  camStatus.textContent=`${photos.length} / ${MAX_SHOTS} 촬영됨`;
+
+  if(photos.length>=MAX_SHOTS){
+    shootBtn.disabled=true; retakeBtn.style.display='';
+    camStatus.textContent='4장을 선택하세요 →';
+    selectHint.innerHTML=`사진을 탭하여 <strong style="color:var(--accent)">4장</strong> 선택<br><span style="color:var(--text3);font-size:10px;">선택 순서대로 위→아래 배치</span>`;
+  } else {
+    await sleep(200); shootBtn.disabled=false;
+  }
+  isShooting=false;
+}
+
+function toggleSelect(idx){
+  if(photos[idx]===undefined)return;
+  const pos=selected.indexOf(idx);
+  if(pos!==-1){
+    selected.splice(pos,1);
+    document.getElementById('thumb'+idx).classList.remove('selected');
+  } else {
+    if(selected.length>=MAX_SEL){
+      const removed=selected.shift();
+      document.getElementById('thumb'+removed).classList.remove('selected');
+    }
+    selected.push(idx);
+    document.getElementById('thumb'+idx).classList.add('selected');
+  }
+  selected.forEach((pIdx,order)=>{
+    const el=document.getElementById('thumb'+pIdx);
+    if(el) el.querySelector('.thumb-order').textContent=order+1;
+  });
+  btnNext.disabled=selected.length<MAX_SEL;
+  const rem=MAX_SEL-selected.length;
+  if(selected.length===MAX_SEL){
+    selectHint.innerHTML='선택 완료! 아래 버튼을 누르세요 ↓';
+  } else {
+    selectHint.innerHTML=`<strong style="color:var(--accent)">${rem}장</strong> 더 선택하세요<br><span style="color:var(--text3);font-size:10px;">선택 순서대로 위→아래 배치</span>`;
+  }
+}
+
+/* ── FRAMES ── */
+const builtinSVGs={
+  white:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" preserveAspectRatio="none"><rect x="0" y="0" width="300" height="18" fill="white"/><rect x="0" y="382" width="300" height="18" fill="white"/><rect x="0" y="0" width="18" height="400" fill="white"/><rect x="282" y="0" width="18" height="400" fill="white"/></svg>`,
+  pink:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" preserveAspectRatio="none"><rect x="0" y="0" width="300" height="20" fill="#F4C0D1"/><rect x="0" y="380" width="300" height="20" fill="#F4C0D1"/><rect x="0" y="0" width="20" height="400" fill="#F4C0D1"/><rect x="280" y="0" width="20" height="400" fill="#F4C0D1"/><rect x="8" y="8" width="284" height="384" fill="none" stroke="#e8a0b0" stroke-width="1"/><text x="150" y="396" text-anchor="middle" font-size="9" fill="#c47a90" font-family="serif">✦ life4cut ✦</text></svg>`,
+  dark:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" preserveAspectRatio="none"><rect x="0" y="0" width="300" height="22" fill="#1a1714"/><rect x="0" y="378" width="300" height="22" fill="#1a1714"/><rect x="0" y="0" width="22" height="400" fill="#1a1714"/><rect x="278" y="0" width="22" height="400" fill="#1a1714"/><rect x="10" y="10" width="280" height="380" fill="none" stroke="#c9a96e" stroke-width="0.8"/><text x="150" y="396" text-anchor="middle" font-size="9" fill="#c9a96e" font-family="serif" letter-spacing="3">LIFE4CUT</text></svg>`
+};
+const frameImages={};
+Object.entries(builtinSVGs).forEach(([k,svg])=>{
+  const blob=new Blob([svg],{type:'image/svg+xml'});
+  const url=URL.createObjectURL(blob);
+  const img=new Image(); img.src=url;
+  frameImages[k]=img;
+});
+
+function getFrameImage(){
+  if(currentFrame==='custom')return customFrameImg;
+  if(currentFrame!=='none')return frameImages[currentFrame];
+  return null;
+}
+function setFrame(name,btn){
+  currentFrame=name;
+  document.querySelectorAll('.chip').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const fImg=getFrameImage();
+  if(name==='none'){ frameOverlay.style.display='none'; }
+  else if(fImg){ frameOverlay.src=fImg.src; frameOverlay.style.display='block'; }
+  specFrame.textContent=name==='none'?'없음':name==='custom'?'커스텀':name;
+}
+function uploadFrame(event){
+  const file=event.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      customFrameImg=img; frameOverlay.src=e.target.result;
+      frameOverlay.style.display='block'; currentFrame='custom';
+      document.querySelectorAll('.chip').forEach(b=>b.classList.remove('active'));
+      specFrame.textContent='커스텀';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── NAVIGATION ── */
+function goToPreview(){
+  if(selected.length<MAX_SEL)return;
+  buildStripPreview();
+  document.getElementById('screenCamera').classList.remove('active');
+  document.getElementById('screenPreview').classList.add('active');
+}
+function backToCamera(){
+  document.getElementById('screenPreview').classList.remove('active');
+  document.getElementById('screenCamera').classList.add('active');
+}
+function retakeAll(){
+  photos=[]; selected=[]; isShooting=false;
+  initUI();
+  shootBtn.disabled=!cameraOn; retakeBtn.style.display='none'; btnNext.disabled=true;
+  camStatus.textContent=cameraOn?'촬영 준비됨':'준비 중';
+  selectHint.innerHTML='사진을 탭하여 <strong style="color:var(--accent)">4장</strong> 선택<br><span style="color:var(--text3);font-size:10px;">선택 순서대로 위→아래 배치</span>';
+}
+function startFresh(){ retakeAll(); backToCamera(); }
+
+/* ── STRIP PREVIEW ── */
+function buildStripPreview(){
+  stripInner.innerHTML='';
+  // 4 rows × 2 cols — both columns show same photo per row
+  for(let row=0;row<4;row++){
+    for(let col=0;col<2;col++){
+      const cell=document.createElement('div');
+      cell.className='strip-cell';
+      const pIdx=selected[row];
+      if(photos[pIdx]){
+        const img=document.createElement('img');
+        img.src=photos[pIdx]; cell.appendChild(img);
+      }
+      stripInner.appendChild(cell);
+    }
+  }
+}
+
+/* ── DOWNLOAD: 102×152mm @ 300dpi ── */
+async function downloadStrip(){
+  const DPI=300, MM=DPI/25.4;
+  const W=Math.round(102*MM);  // 1205px
+  const H=Math.round(152*MM);  // 1795px
+  const margin=Math.round(3*MM);
+  const gap=Math.round(2*MM);
+  const footerH=Math.round(5*MM);
+  const innerH=H-margin*2-footerH;
+  const cellW=Math.round((W-margin*2-gap)/2);
+  const cellH=Math.round((innerH-gap*3)/4);
+
+  const canvas=document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+
+  const imgs=await Promise.all(selected.map(idx=>new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>res(img); img.onerror=()=>res(null);
+    img.src=photos[idx];
+  })));
+
+  for(let row=0;row<4;row++){
+    const y=margin+row*(cellH+gap);
+    for(let col=0;col<2;col++){
+      const x=margin+col*(cellW+gap);
+      const img=imgs[row];
+      if(img){
+        const sAR=img.naturalWidth/img.naturalHeight, dAR=cellW/cellH;
+        let sx,sy,sw,sh;
+        if(sAR>dAR){ sh=img.naturalHeight; sw=sh*dAR; sx=(img.naturalWidth-sw)/2; sy=0; }
+        else { sw=img.naturalWidth; sh=sw/dAR; sx=0; sy=(img.naturalHeight-sh)/2; }
+        ctx.drawImage(img,sx,sy,sw,sh,x,y,cellW,cellH);
+      } else {
+        ctx.fillStyle='#eeeeee'; ctx.fillRect(x,y,cellW,cellH);
+      }
+    }
+  }
+
+  // Footer
+  const fontSize=Math.round(3.5*MM);
+  ctx.fillStyle='#bbbbbb';
+  ctx.font=`${fontSize}px serif`;
+  ctx.textAlign='center';
+  ctx.fillText('인생네컷',W/2,H-margin+fontSize*0.3);
+
+  const link=document.createElement('a');
+  link.download=`life4cut_${Date.now()}.png`;
+  link.href=canvas.toDataURL('image/png');
+  link.click();
+}
+</script>
+</body>
+</html>
