@@ -35,6 +35,11 @@ body {
 .screen { display: none; flex-direction: column; height: 100vh; overflow: hidden; }
 .screen.active { display: flex; }
 
+@media (orientation: portrait) {
+  .screen { height: auto; min-height: 100vh; overflow: auto; }
+  html, body { overflow: auto; height: auto; }
+}
+
 /* ── CAMERA SCREEN ── */
 .cam-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -276,10 +281,12 @@ body {
 @media (orientation: portrait) {
   .cam-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
   .viewfinder-col { border-right: none; border-bottom: 1px solid var(--border); }
-  .thumb-col { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 10px 12px; max-height: 130px; flex-shrink: 0; }
-  .thumb-col-title, .select-hint, .btn-next { display: none; }
-  .thumbs-grid { display: flex; flex-direction: row; gap: 7px; height: 100%; min-width: max-content; }
-  .thumb-item { width: 74px; height: auto; }
+  .thumb-col { flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: 10px 12px; max-height: 280px; flex-shrink: 0; }
+  .thumb-col-title { display: block; }
+  .thumbs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .thumb-item { width: auto; }
+  .select-hint { display: block; }
+  .btn-next { display: block; }
   .preview-body { flex-direction: column; padding: 16px; gap: 18px; overflow-y: auto; }
   .strip-preview { height: auto; width: min(58vw, 260px); }
   .preview-info { max-width: 100%; }
@@ -497,6 +504,11 @@ async function shoot(){
   thumb.classList.remove('empty');
   thumb.innerHTML=`<img src="${dataUrl}" alt=""><div class="thumb-check"></div><div class="thumb-order"></div>`;
   thumb.onclick=()=>toggleSelect(idx);
+  // 8장 미만이어도 즉시 선택 가능하도록 selectHint 업데이트
+  if(photos.length<MAX_SHOTS){
+    const rem=MAX_SEL-selected.length;
+    selectHint.innerHTML=`사진을 탭하여 <strong style="color:var(--accent)">${rem}장</strong> 선택<br><span style="color:var(--text3);font-size:10px;">선택 순서대로 위→아래 배치</span>`;
+  }
 
   shotLabel.textContent=`${photos.length} / 8`;
   camStatus.textContent=`${photos.length} / ${MAX_SHOTS} 촬영됨`;
@@ -588,6 +600,7 @@ function goToPreview(){
   buildStripPreview();
   document.getElementById('screenCamera').classList.remove('active');
   document.getElementById('screenPreview').classList.add('active');
+  window.scrollTo(0,0);
 }
 function backToCamera(){
   document.getElementById('screenPreview').classList.remove('active');
